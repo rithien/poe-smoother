@@ -270,7 +270,7 @@ public partial class MainViewModel : ObservableObject
         if (value)
         {
             // Set all visual mods to MAX values
-            SelectedZoomLevel = 3;        // x3 (Max Zoom Out)
+            SelectedZoomLevel = 0;        // x3 (Max Zoom Out)
             SelectedBrightnessLevel = 3;  // x1.75 (+75%)
             SelectedSdrScaleLevel = 3;    // x1.75 (+75%)
             SelectedGammaLevel = 3;       // 1.6 (Very Bright)
