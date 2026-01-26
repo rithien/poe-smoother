@@ -1,0 +1,32 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch PoeEditor.UI",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/PoeEditor.UI/bin/Debug/net9.0-windows/PoeEditor.UI.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/PoeEditor.UI",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Launch PoeEditor.UI (Release)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-release",
+            "program": "${workspaceFolder}/src/PoeEditor.UI/bin/Release/net9.0-windows/PoeEditor.UI.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/PoeEditor.UI",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Attach to Process",
+            "type": "coreclr",
+            "request": "attach"
+        }
+    ]
+}

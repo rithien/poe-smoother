@@ -1,0 +1,16 @@
+{
+    "enabled": true,
+    "name": "Brightness x{{MULTIPLIER}}",
+    "description": "Increases global brightness by {{PERCENTAGE}}%",
+    "category": "Visual",
+    "impactLevel": 4,
+    "repatch": true,
+    "markerFile": "shaders/postprocessuber.hlsl",
+    "marker": "{{RITHIEN_brightness}}",
+    "targets": {
+        "files": ["shaders/postprocessuber.hlsl"],
+        "extensions": [],
+        "basePaths": []
+    },
+    "replacements": []
+}

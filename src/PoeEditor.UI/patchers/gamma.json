@@ -1,0 +1,16 @@
+{
+    "enabled": true,
+    "name": "Gamma {{GAMMA_VALUE}}",
+    "description": "{{DESCRIPTION}} (gamma {{GAMMA_VALUE}})",
+    "category": "Visual",
+    "impactLevel": 3,
+    "repatch": true,
+    "markerFile": "shaders/include/oetf.hlsl",
+    "marker": "{{RITHIEN_gamma}}",
+    "targets": {
+        "files": ["shaders/include/oetf.hlsl"],
+        "extensions": [],
+        "basePaths": []
+    },
+    "replacements": []
+}

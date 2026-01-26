@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Disable Bloom",
+  "description": "Disables bloom post-processing effect for clearer visuals",
+  "category": "Post-Processing",
+  "impactLevel": 5,
+  "markerFile": "shaders/postprocessuber.hlsl",
+  "marker": "{{RITHIEN_bloom}}",
+  "targets": {
+    "files": ["shaders/postprocessuber.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "// Bloom is un-jittered before blurring, but output is jittered, so add jittering here again",
+      "replacement": "return colour;//{{RITHIEN_bloom}}",
+      "isRegex": false
+    }
+  ]
+}

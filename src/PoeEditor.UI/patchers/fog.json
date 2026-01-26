@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Disable Fog",
+  "description": "Removes fog effects for improved visibility and performance",
+  "category": "Environment",
+  "impactLevel": 6,
+  "markerFile": "shaders/renderer/common.ffx",
+  "marker": "{{RITHIEN_fog}}",
+  "targets": {
+    "files": [
+      "shaders/renderer/common.ffx"
+    ],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "#define NEW_LIGHT 0",
+      "replacement": "#define NEW_LIGHT 0\r\n\t#define fog_exp_enabled 0\r\n\t#define fog_linear_enabled 0\r\n\t//{{RITHIEN_fog}}",
+      "isRegex": false
+    }
+  ]
+}

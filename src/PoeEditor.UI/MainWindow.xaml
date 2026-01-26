@@ -1,0 +1,322 @@
+﻿<Window x:Class="PoeEditor.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:PoeEditor.UI"
+        xmlns:vm="clr-namespace:PoeEditor.UI.ViewModels"
+        mc:Ignorable="d"
+        Title="POE Editor Patcher" Height="700" Width="1100"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E2E">
+    
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <!-- Dark Theme Colors -->
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#1E1E2E"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#2A2A3E"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#7C3AED"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#8B5CF6"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#CDD6F4"/>
+        <SolidColorBrush x:Key="TextMutedBrush" Color="#6C7086"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#45475A"/>
+        
+        <!-- Button Style -->
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- Secondary Button Style -->
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#353550"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- TreeView Item Template -->
+        <HierarchicalDataTemplate x:Key="FileTreeTemplate" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal" Margin="2">
+                <TextBlock Text="{Binding Name}" 
+                           Foreground="{Binding IsDirectory, Converter={StaticResource DirectoryColorConverter}}"
+                           FontWeight="{Binding IsDirectory, Converter={StaticResource DirectoryFontConverter}}"/>
+                <TextBlock Text="{Binding Size, StringFormat=' ({0:N0} bytes)'}" 
+                           Foreground="{StaticResource TextMutedBrush}"
+                           Visibility="{Binding IsDirectory, Converter={StaticResource InverseBoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </HierarchicalDataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <Button Grid.Column="0" Content="📁 Open Archive" 
+                        Command="{Binding OpenArchiveCommand}"
+                        Style="{StaticResource ModernButton}" Margin="0,0,8,0"/>
+                
+                <Button Grid.Column="1" Content="❌ Close File"
+                        Command="{Binding CloseArchiveCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"/>
+                
+                <Button Grid.Column="2" Content="🔧 Patch Module" 
+                        Click="OpenPatcherWindow_Click"
+                        Style="{StaticResource ModernButton}" 
+                        Background="#2D5A3D"
+                        Margin="0,0,8,0"/>
+                
+                <!-- Spacer -->
+                
+                <Button Grid.Column="4" Content="📤 Extract Selected" 
+                        Command="{Binding ExtractSelectedCommand}"
+                        Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"/>
+                
+                <Button Grid.Column="5" Content="📦 Extract All" 
+                        Command="{Binding ExtractAllCommand}"
+                        Style="{StaticResource ModernButton}" Margin="0,0,8,0"/>
+                
+                <Button Grid.Column="6" Content="❌ Cancel" 
+                        Command="{Binding CancelExtractionCommand}"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Style="{StaticResource SecondaryButton}"/>
+            </Grid>
+        </Border>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" Margin="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="280"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- File Tree -->
+            <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Margin="0,0,8,0">
+                <TreeView x:Name="FileTreeView"
+                          ItemsSource="{Binding FileTree}"
+                          SelectedItemChanged="FileTreeView_SelectedItemChanged"
+                          Background="Transparent"
+                          Foreground="{StaticResource TextBrush}"
+                          BorderThickness="0"
+                          Padding="8">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem">
+                            <EventSetter Event="MouseDoubleClick" Handler="TreeViewItem_MouseDoubleClick"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                    <TreeView.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <StackPanel Orientation="Horizontal" Margin="2">
+                                <TextBlock Text="{Binding IsDirectory, Converter={StaticResource DirectoryIconConverter}}"
+                                           Margin="0,0,6,0"/>
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{StaticResource TextBrush}"/>
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                    </TreeView.ItemTemplate>
+                </TreeView>
+            </Border>
+
+            <!-- Details Panel -->
+            <Border Grid.Column="1" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="16,16,8,16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="File Details" 
+                                   FontSize="18" 
+                                   FontWeight="Bold" 
+                                   Foreground="{StaticResource TextBrush}"
+                                   Margin="0,0,0,16"/>
+                        
+                        <TextBlock Text="Name:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding SelectedEntry.Name, FallbackValue='-'}" 
+                                   Foreground="{StaticResource TextBrush}" 
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"/>
+                        
+                        <TextBlock Text="Path:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding SelectedEntry.FullPath, FallbackValue='-'}" 
+                                   Foreground="{StaticResource TextBrush}" 
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,12"/>
+                        
+                        <TextBlock Text="Type:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding SelectedEntry.IsDirectory, Converter={StaticResource TypeConverter}, FallbackValue='-'}" 
+                                   Foreground="{StaticResource TextBrush}"
+                                   Margin="0,0,0,12"/>
+                        
+                        <TextBlock Text="Size:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{Binding SelectedEntry.Size, StringFormat='{}{0:N0} bytes', FallbackValue='-'}" 
+                                   Foreground="{StaticResource TextBrush}"
+                                   Margin="0,0,0,24"/>
+
+                        <!-- Elasticsearch Section -->
+                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
+                            <Expander IsExpanded="False">
+                                <Expander.Header>
+                                    <TextBlock Text="🔍 Elasticsearch" 
+                                               FontSize="16" 
+                                               FontWeight="Bold" 
+                                               Foreground="{StaticResource TextBrush}"/>
+                                </Expander.Header>
+                                <StackPanel Margin="0,12,0,0">
+                                    <TextBlock Text="URL:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding ElasticsearchUrl, UpdateSourceTrigger=PropertyChanged}" 
+                                             Background="#353550"
+                                             Foreground="{StaticResource TextBrush}"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             Padding="8,6"
+                                             Margin="0,0,0,8"/>
+                                    
+                                    <TextBlock Text="Index Name:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding ElasticsearchIndexName, UpdateSourceTrigger=PropertyChanged}" 
+                                             Background="#353550"
+                                             Foreground="{StaticResource TextBrush}"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             Padding="8,6"
+                                             Margin="0,0,0,8"/>
+                                    
+                                    <TextBlock Text="Username:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                                    <TextBox Text="{Binding ElasticsearchUsername, UpdateSourceTrigger=PropertyChanged}" 
+                                             Background="#353550"
+                                             Foreground="{StaticResource TextBrush}"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             Padding="8,6"
+                                             Margin="0,0,0,8"/>
+                                    
+                                    <TextBlock Text="Password:" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,4"/>
+                                    <PasswordBox x:Name="ElasticPasswordBox"
+                                             Background="#353550"
+                                             Foreground="{StaticResource TextBrush}"
+                                             BorderBrush="{StaticResource BorderBrush}"
+                                             Padding="8,6"
+                                             Margin="0,0,0,12"
+                                             PasswordChanged="ElasticPasswordBox_PasswordChanged"/>
+                                    
+                                    <Button Content="{Binding IsElasticsearchConnected, Converter={StaticResource ConnectedTextConverter}}"
+                                            Command="{Binding ConnectToElasticsearchCommand}"
+                                            Margin="0,0,0,8">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsElasticsearchConnected}" Value="True">
+                                                        <Setter Property="Background" Value="#2D5A3D"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                    
+                                    <Button Content="📥 Index All" 
+                                            Command="{Binding IndexToElasticsearchCommand}"
+                                            Style="{StaticResource ModernButton}"
+                                            IsEnabled="{Binding IsElasticsearchConnected}"
+                                            Margin="0,0,0,8"/>
+                                    
+                                    <Button Content="📤 Index Selected" 
+                                            Command="{Binding IndexSelectedToElasticsearchCommand}"
+                                            Style="{StaticResource SecondaryButton}"
+                                            IsEnabled="{Binding IsElasticsearchConnected}"/>
+                                </StackPanel>
+                            </Expander>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Status Bar -->
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" Padding="16,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="200"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- Defender Exclusion Toggle -->
+                <Button Grid.Column="0" 
+                        Command="{Binding ToggleDefenderExclusionCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        Padding="8,6"
+                        Margin="0,0,16,0"
+                        ToolTip="Toggle Windows Defender exclusion for output folder (requires Admin)">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🛡️" Margin="0,0,6,0"/>
+                        <TextBlock>
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Defender: Scanning"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding DefenderExclusionEnabled}" Value="True">
+                                            <Setter Property="Text" Value="Defender: Excluded"/>
+                                            <Setter Property="Foreground" Value="#A6E3A1"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Button>
+                
+                <TextBlock Grid.Column="1" 
+                           Text="{Binding StatusText}" 
+                           Foreground="{StaticResource TextBrush}"
+                           VerticalAlignment="Center"/>
+                
+                <ProgressBar Grid.Column="2" 
+                             Value="{Binding ProgressValue}" 
+                             Maximum="{Binding ProgressMax}"
+                             Height="8"
+                             Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                             Background="{StaticResource BorderBrush}"
+                             Foreground="{StaticResource AccentBrush}"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

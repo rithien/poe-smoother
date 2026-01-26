@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Disable Depth of Field",
+  "description": "Disables depth of field blur effect for sharper visuals",
+  "category": "Post-Processing",
+  "impactLevel": 5,
+  "markerFile": "shaders/postprocessuber.hlsl",
+  "marker": "{{RITHIEN_depthoffield}}",
+  "targets": {
+    "files": ["shaders/postprocessuber.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "CBUFFER_END\r\n",
+      "replacement": "CBUFFER_END//{{RITHIEN_depthoffield}}\r\n#define ritual_sphere_ratio 0\r\n#define azmeri_enable 0\r\n#define decay_enable 0\r\n#define desaturation_enable 0\r\n#define dof_enable 0\r\n",
+      "oldpattern": "(\\/\\/\\{\\{RITHIEN_depthoffield\\}\\}\\s*)?colour\\s*=\\s*ApplyDoF\\(colour,",
+      "oldreplacement": "//{{RITHIEN_depthoffield}} colour = ApplyDoF(colour,",
+      "isRegex": false
+    }
+  ]
+}

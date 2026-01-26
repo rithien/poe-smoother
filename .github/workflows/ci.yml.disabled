@@ -1,0 +1,79 @@
+name: CI Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+env:
+  DOTNET_VERSION: "9.0.x"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build Debug
+        run: dotnet build --configuration Debug --no-restore
+
+      - name: Build Release
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish (dry-run)
+        run: |
+          dotnet publish src/PoeEditor.UI/PoeEditor.UI.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish/win-x64 `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Verify publish output
+        run: |
+          if (!(Test-Path "./publish/win-x64/PoeEditor.UI.exe")) {
+            Write-Error "PoeEditor.UI.exe not found in publish output"
+            exit 1
+          }
+          if (!(Test-Path "./publish/win-x64/oo2core.dll")) {
+            Write-Error "oo2core.dll not found in publish output"
+            exit 1
+          }
+          if (!(Test-Path "./publish/win-x64/patchers")) {
+            Write-Error "patchers folder not found in publish output"
+            exit 1
+          }
+          Write-Host "Publish output verified successfully"
+          Get-ChildItem -Path "./publish/win-x64" -Recurse | Format-Table Name, Length
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PoeEditorPatcher-win-x64-${{ github.sha }}
+          path: ./publish/win-x64/
+          retention-days: 7

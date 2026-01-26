@@ -1,0 +1,27 @@
+{
+    "enabled": true,
+    "name": "Simplify Global Illumination",
+    "description": "Reduces expensive ray-marching calculations for ambient lighting, significant FPS boost",
+    "category": "Lighting",
+    "impactLevel": 9,
+    "repatch": true,
+    "markerFile": "shaders/globalillumination.hlsl",
+    "marker": "{{RITHIEN_globalillumination}}",
+    "targets": {
+        "files": ["shaders/globalillumination.hlsl"],
+        "extensions": [],
+        "basePaths": []
+    },
+    "replacements": [
+        {
+            "pattern": "AmbientLight ComputeAmbientLight(uint2 pixel_coord)\r\n{",
+            "replacement": "AmbientLight ComputeAmbientLight(uint2 pixel_coord)\r\n{\r\n\t// {{MARKER}}: Early return to skip expensive ray-marching\r\n\tAmbientLight res;\r\n\tres.env_light = {{ENV_LIGHT}}f;\r\n\tres.indirect_light = float3({{INDIRECT_LIGHT}}f, {{INDIRECT_LIGHT}}f, {{INDIRECT_LIGHT}}f);\r\n\treturn res;\r\n\t// Original code below (never executed):",
+            "isRegex": false
+        },
+        {
+            "pattern": "AmbientLight ComputeAmbientLight\\(uint2 pixel_coord\\)\\s*\\{\\s*// {{MARKER_ESCAPED}}: Early return to skip expensive ray-marching\\s*AmbientLight res;\\s*res\\.env_light = [\\d.]+f;\\s*res\\.indirect_light = float3\\([\\d.]+f, [\\d.]+f, [\\d.]+f\\);\\s*return res;\\s*// Original code below \\(never executed\\):",
+            "replacement": "AmbientLight ComputeAmbientLight(uint2 pixel_coord)\r\n{\r\n\t// {{MARKER}}: Early return to skip expensive ray-marching\r\n\tAmbientLight res;\r\n\tres.env_light = {{ENV_LIGHT}}f;\r\n\tres.indirect_light = float3({{INDIRECT_LIGHT}}f, {{INDIRECT_LIGHT}}f, {{INDIRECT_LIGHT}}f);\r\n\treturn res;\r\n\t// Original code below (never executed):",
+            "isRegex": true
+        }
+    ]
+}

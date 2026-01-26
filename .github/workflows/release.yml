@@ -1,0 +1,144 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g., v1.0.0)"
+        required: true
+        default: "v1.0.0"
+
+env:
+  DOTNET_VERSION: "9.0.x"
+  PROJECT_PATH: "src/PoeEditor.UI/PoeEditor.UI.csproj"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish Windows x64
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output ./publish/win-x64 `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true
+
+      - name: Copy required files
+        run: |
+          Copy-Item -Path "./libs/oo2core.dll" -Destination "./publish/win-x64/" -Force
+          New-Item -Path "./publish/win-x64/patchers" -ItemType Directory -Force | Out-Null
+          Copy-Item -Path "./src/PoeEditor.UI/patchers/*" -Destination "./publish/win-x64/patchers/" -Force
+
+      - name: Verify build output
+        run: |
+          if (!(Test-Path "./publish/win-x64/PoeEditor.UI.exe")) {
+            Write-Error "PoeEditor.UI.exe not found in publish output"
+            exit 1
+          }
+          if (!(Test-Path "./publish/win-x64/oo2core.dll")) {
+            Write-Error "oo2core.dll not found in publish output"
+            exit 1
+          }
+          if (!(Test-Path "./publish/win-x64/patchers")) {
+            Write-Error "patchers folder not found in publish output"
+            exit 1
+          }
+          Write-Host "Build verification passed!"
+
+      - name: Create Release Archive
+        run: |
+          Compress-Archive -Path ./publish/win-x64/* -DestinationPath ./PoeEditorPatcher-win-x64.zip
+
+      - name: Get version
+        id: version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            echo "VERSION=${{ github.event.inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            $tag = "${{ github.ref_name }}"
+            echo "VERSION=$tag" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: POE Editor Patcher ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            ./PoeEditorPatcher-win-x64.zip
+          body: |
+            ## POE Editor Patcher ${{ steps.version.outputs.VERSION }}
+
+            ### Features
+            - [x] Open Content.ggpk (Standalone version)
+            - [x] Open \_.index.bin (Steam/Epic version)
+            - [x] Auto-detect installation folder
+            - [x] Browse virtual file system
+            - [x] Extract individual files
+            - [x] Extract entire directories
+            - [x] Extract all files with progress
+            - [x] Index files to Elasticsearch
+            - [x] Marker-based patch detection (idempotent patching)
+            - [x] Persistent backups with First Touch strategy
+            - [x] External JSON patcher configs (no recompilation needed)
+            - [x] Grouped patches UI (Visual Mods / Performance Mods)
+            - [x] Close File button to release archive
+            - [x] **File Preview & Edit** - double-click to view/edit file contents in modal window
+
+            ### Performance Optimizations
+            | Optimization       | Impact    | Target Files                               | Status  |
+            | ------------------ | --------- | ------------------------------------------ | ------- |
+            | Disable Bloom      | High      | `postprocessuber.hlsl` (ApplyBloom)        | ✅ Done |
+            | Disable DoF        | Medium    | `postprocessuber.hlsl` (ApplyDoF)          | ✅ Done |
+            | Simplify GI        | Very High | `globalillumination.hlsl` - early return   | ✅ Done |
+            | Fog Removal        | Medium    | `fog.ffx`, `postprocessuber.hlsl`          | ✅ Done |
+            | Camera Zoom        | Visual    | `.ot`/`.otc` files (CreateCameraZoomNode)  | ✅ Done |
+            | Brightness Boost   | Visual    | `postprocessuber.hlsl` (Colour Multiplier) | ✅ Done |
+            | SDR Scale Boost    | Visual    | `oetf.hlsl` (OutputSDR multiplier)         | ✅ Done |
+            | Gamma Adjustment   | Visual    | `oetf.hlsl` (OETF gamma curve)             | ✅ Done |
+            | Disable SSAO       | High      | `screenspaceambientocclusion.hlsl`         | ✅ Done |
+            | SS Shadows         | High      | `screenspaceshadows.hlsl`                  | ✅ Done |
+            | Map Reveal         | Visual    | `minimap_blending_pixel.hlsl`              | ✅ Done |
+            | Disable Vignette   | Low       | `postprocessuber.hlsl` (ApplyVignette)     | ✅ Done |
+            | Env Particles      | High      | `metadata/terrain/*{fog,mist,dust}.aoc`    | ✅ Done |
+            | Volumetric FX      | Medium    | `volumetricfx.hlsl`                        | Planned |
+            | SS Rays            | Medium    | `screenspacerays.hlsl`                     | Planned |
+            | Torch Flames       | Medium    | `metadata/terrain/*torch*.aoc`             | Planned |
+            | Simplify Spells    | Medium    | `metadata/effects/spells/*.aoc`            | Planned |
+            | Monster Effects    | High      | `metadata/effects/spells/monsters_effects` | Planned |
+            | Decorative Blood   | Low       | `metadata/terrain/*blood*.aoc`             | Planned |
+            | Simplify Materials | Medium    | 136,006 `.mat` files                       | Planned |
+
+            ### Installation
+            1. Download `PoeEditorPatcher-win-x64.zip`
+            2. Extract to any folder
+            3. Run `PoeEditor.UI.exe`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

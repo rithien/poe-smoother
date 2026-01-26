@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Disable SSAO",
+  "description": "Disables Screen Space Ambient Occlusion for improved performance, reduces local shadow detail",
+  "category": "Lighting",
+  "impactLevel": 7,
+  "markerFile": "shaders/screenspaceambientocclusion.hlsl",
+  "marker": "{{RITHIEN_ssao}}",
+  "targets": {
+    "files": ["shaders/screenspaceambientocclusion.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern":"float pi = 3.141592f;",
+      "replacement":"return 1.0f; //{{RITHIEN_ssao}}\r\n\tfloat pi=3.141592f;",
+      "oldpattern": "float ComputeAmbientLight(float2 screenspace_point)\r\n{",
+      "oldreplacement": "float ComputeAmbientLight(float2 screenspace_point)\r\n{\r\n\treturn 1.0f; //{{RITHIEN_ssao}}",
+      "isRegex": false
+    }
+  ]
+}

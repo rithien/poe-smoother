@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Disable SS Shadows",
+  "description": "Disables Screen Space Shadows for improved performance, reduces dynamic shadow detail",
+  "category": "Lighting",
+  "impactLevel": 7,
+  "markerFile": "shaders/screenspaceshadows.hlsl",
+  "marker": "{{RITHIEN_ssshadows}}",
+  "targets": {
+    "files": ["shaders/screenspaceshadows.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "uint2 pixel_coord = uint2(input.screen_coord.xy);",
+      "replacement": "OutPixel r;\r\n\tr.shadowmap_data = float4(1.0f, 1.0f, 1.0f, 1.0f);\r\n\treturn r;//{{RITHIEN_ssshadows}}\r\n\tuint2 pixel_coord=uint2(input.screen_coord.xy);",
+      "oldpattern": "OutPixel ComputeScreenspaceShadows( PInput input )",
+      "oldreplacement": "OutPixel ComputeScreenspaceShadows( PInput input ) { OutPixel r; r.shadowmap_data = float4(1.0f, 1.0f, 1.0f, 1.0f); return r; } //{{RITHIEN_ssshadows}}\r\nOutPixel ComputeScreenspaceShadows_DISABLED( PInput input )",
+      "isRegex": false
+    }
+  ]
+}

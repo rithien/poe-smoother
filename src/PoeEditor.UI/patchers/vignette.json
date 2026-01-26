@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Disable Vignette",
+  "description": "Removes screen edge darkening effect for clearer visuals",
+  "category": "Post-Processing",
+  "impactLevel": 2,
+  "markerFile": "shaders/postprocessuber.hlsl",
+  "marker": "{{RITHIEN_vignette}}",
+  "targets": {
+    "files": ["shaders/postprocessuber.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "colour = ApplyVignette(colour, screen_pos);",
+      "replacement": "//{{RITHIEN_vignette}}colour = ApplyVignette(colour, screen_pos);",
+      "isRegex": false
+    }
+  ]
+}

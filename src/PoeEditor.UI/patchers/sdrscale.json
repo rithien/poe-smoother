@@ -1,0 +1,16 @@
+{
+    "enabled": true,
+    "name": "SDR Scale x{{MULTIPLIER}}",
+    "description": "Increases SDR output brightness by {{PERCENTAGE}}%",
+    "category": "Visual",
+    "impactLevel": 3,
+    "repatch": true,
+    "markerFile": "shaders/include/oetf.hlsl",
+    "marker": "{{RITHIEN_sdrscale}}",
+    "targets": {
+        "files": ["shaders/include/oetf.hlsl"],
+        "extensions": [],
+        "basePaths": []
+    },
+    "replacements": []
+}

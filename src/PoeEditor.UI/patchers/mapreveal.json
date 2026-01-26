@@ -1,0 +1,31 @@
+{
+  "enabled": true,
+  "name": "Map Reveal",
+  "description": "Reveals unexplored areas on the minimap by modifying walkability and visibility shaders",
+  "category": "Visual",
+  "impactLevel": 3,
+  "markerFile": "shaders/minimap_blending_pixel.hlsl",
+  "marker": "{{RITHIEN_mapreveal}}",
+  "targets": {
+    "files": ["shaders/minimap_blending_pixel.hlsl", "shaders/minimap_visibility_pixel.hlsl"],
+    "extensions": [],
+    "basePaths": []
+  },
+  "replacements": [
+    {
+      "pattern": "float4 walkable_color = float4\\([^)]+\\);(\\s*//\\{\\{RITHIEN_mapreveal\\}\\})?",
+      "replacement": "float4 walkable_color = float4(0.0f, 0.0f, 0.0f, 0.3f); //{{RITHIEN_mapreveal}}",
+      "isRegex": true
+    },
+    {
+      "pattern": "float4 walkability_map_color = lerp\\(walkable_color, float4\\([^)]+\\), walkable_to_edge_ratio\\);",
+      "replacement": "float4 walkability_map_color = lerp(walkable_color, float4(12.00f, 12.00f, 12.00f, 0.1f), walkable_to_edge_ratio);",
+      "isRegex": true
+    },
+    {
+      "pattern": "res_color = float4\\((0\\.0f|0\\.18f), 0\\.0f, 0\\.0f, 1\\.0f\\);",
+      "replacement": "res_color = float4(0.18f, 0.0f, 0.0f, 1.0f);",
+      "isRegex": true
+    }
+  ]
+}

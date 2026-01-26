@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "name": "Camera Zoom x{{ZOOM_LEVEL}}",
+  "description": "Modifies camera zoom level to {{ZOOM_LEVEL}}x. Adds zoom to character.ot and modifies existing CreateCameraZoomNode calls.",
+  "category": "Camera",
+  "impactLevel": 3,
+  "repatch": true,
+  "markerFile": "metadata/characters/character.ot",
+  "marker": "{{RITHIEN_camerazoom}}",
+  "targets": {
+    "files": ["metadata/characters/character.ot"],
+    "extensions": [".otc"],
+    "basePaths": ["metadata/"]
+  },
+  "replacements": []
+}

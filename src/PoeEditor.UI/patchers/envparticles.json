@@ -1,0 +1,26 @@
+{
+  "enabled": true,
+  "name": "Disable Environmental Particles",
+  "description": "Removes fog, mist, dust, and glowworm particle effects for better performance",
+  "category": "Particle",
+  "impactLevel": 5,
+  "markerFile": "metadata/terrain/doodads/cave/cave_mist_01.aoc",
+  "marker": "{{RITHIEN_envparticles}}",
+  "targets": {
+    "files": [],
+    "extensions": [".aoc"],
+    "basePaths": ["metadata/terrain/"]
+  },
+  "patterns": [
+    "*fog*.aoc",
+    "*mist*.aoc",
+    "*dust*.aoc",
+    "*glowworm*.aoc"
+  ],
+  "excludePaths": [
+    "metadata/effects/spells/",
+    "metadata/effects/microtransactions/",
+    "metadata/monsters/"
+  ],
+  "replacements": []
+}
