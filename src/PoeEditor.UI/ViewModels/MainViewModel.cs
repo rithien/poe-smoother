@@ -73,9 +73,21 @@ public partial class MainViewModel : ObservableObject
     {
         _extractionService = extractionService;
         _elasticsearchService = new ElasticsearchService();
-        _backupService = new BackupService();
+
+        // Initialize logging
+        var logService = FileLogService.Instance;
+        logService.CleanupOldLogs(7); // Keep logs for 7 days
+
+        // Initialize backup service with logging
+        _backupService = new BackupService(logService);
+
+        // Set logger for all patchers
+        PatcherLogger.SetLogService(logService);
+
         LoadSettings();
         InitializePatchers();
+
+        logService.LogInfo($"MainViewModel initialized, backup dir: {_backupService.BackupDirectory}");
     }
 
     private void InitializePatchers()
@@ -241,6 +253,81 @@ public partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _envParticlesEnabled = false;
+
+    // ===== SELECT ALL PROPERTIES =====
+
+    [ObservableProperty]
+    private bool _selectAllVisualMods = false;
+
+    [ObservableProperty]
+    private bool _selectAllPerformanceMods = false;
+
+    [ObservableProperty]
+    private bool _selectAllParticleMods = false;
+
+    partial void OnSelectAllVisualModsChanged(bool value)
+    {
+        if (value)
+        {
+            // Set all visual mods to MAX values
+            SelectedZoomLevel = 3;        // x3 (Max Zoom Out)
+            SelectedBrightnessLevel = 3;  // x1.75 (+75%)
+            SelectedSdrScaleLevel = 3;    // x1.75 (+75%)
+            SelectedGammaLevel = 3;       // 1.6 (Very Bright)
+            MapRevealEnabled = true;
+            VignetteEnabled = true;
+        }
+        else
+        {
+            // Disable all visual mods
+            SelectedZoomLevel = 0;
+            SelectedBrightnessLevel = 0;
+            SelectedSdrScaleLevel = 0;
+            SelectedGammaLevel = 0;
+            MapRevealEnabled = false;
+            VignetteEnabled = false;
+        }
+    }
+
+    partial void OnSelectAllPerformanceModsChanged(bool value)
+    {
+        if (value)
+        {
+            // Enable GI with brightest settings (max values)
+            GiEnabled = true;
+            GiEnvLight = 1f;
+            GiIndirectLight = 1f;
+
+            // Enable all patchers from ItemsControl
+            foreach (var patcher in Patchers)
+            {
+                patcher.IsEnabled = true;
+            }
+        }
+        else
+        {
+            // Disable all performance mods
+            GiEnabled = false;
+            GiEnvLight = 0.15f;  // Reset to defaults
+            GiIndirectLight = 0.1f;
+
+            foreach (var patcher in Patchers)
+            {
+                patcher.IsEnabled = false;
+            }
+        }
+    }
+
+    partial void OnSelectAllParticleModsChanged(bool value)
+    {
+        // Enable/disable all particle mods
+        EnvParticlesEnabled = value;
+        // Future particle patchers will be added here:
+        // TorchFlamesEnabled = value;
+        // SimplifySpellsEnabled = value;
+        // SimplifyMonstersEnabled = value;
+        // DecorativeBloodEnabled = value;
+    }
 
     public BrightnessPatcher? GetActiveBrightnessPatcher()
     {
@@ -980,7 +1067,9 @@ public partial class MainViewModel : ObservableObject
 
         StatusText = $"Restoring {backupPaths.Count} files...";
         var restoredCount = 0;
+        var restoredPaths = new List<string>();
 
+        // Phase 1: Restore all files to memory
         foreach (var virtualPath in backupPaths)
         {
             var data = await _backupService.GetBackupAsync(virtualPath);
@@ -993,9 +1082,23 @@ public partial class MainViewModel : ObservableObject
                 {
                     file.Write(data);
                     restoredCount++;
+                    restoredPaths.Add(virtualPath);
                 }
-                await _backupService.RemoveBackupAsync(virtualPath);
             }
+        }
+
+        // Phase 2: Save changes to disk BEFORE removing backups
+        // This ensures backups remain if save fails
+        if (restoredCount > 0)
+        {
+            StatusText = "Saving restored files to archive...";
+            await Task.Run(() => index.Save());
+        }
+
+        // Phase 3: Remove backups only after successful save
+        foreach (var virtualPath in restoredPaths)
+        {
+            await _backupService.RemoveBackupAsync(virtualPath);
         }
 
         StatusText = $"Restored {restoredCount} files to original state";
@@ -1489,13 +1592,9 @@ public partial class MainViewModel : ObservableObject
                 {
                     patcherVm.IsApplied = true;
                     patcherVm.IsFailed = false;
-
-                    if (patchResult.FilesModified > 0)
-                    {
-                        totalModified += patchResult.FilesModified;
-                        // Save after each patcher so next patcher sees updated content
-                        await Task.Run(() => index.Save());
-                    }
+                    totalModified += patchResult.FilesModified;
+                    // Note: Don't save between patchers - Save() invalidates FileRecord offsets
+                    // causing ArgumentOutOfRangeException when next patcher reads. Save once at end.
                 }
                 else
                 {

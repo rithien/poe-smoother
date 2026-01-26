@@ -15,6 +15,7 @@ public class BackupService : IBackupService
     private readonly string _backupDirectory;
     private readonly Dictionary<string, string> _registeredMarkers = new();
     private readonly object _lock = new();
+    private ILogService? _logService;
 
     public BackupService()
     {
@@ -23,6 +24,16 @@ public class BackupService : IBackupService
             "PoeEditorPatcher",
             "backups"
         );
+    }
+
+    public BackupService(ILogService? logService) : this()
+    {
+        _logService = logService;
+    }
+
+    public void SetLogService(ILogService? logService)
+    {
+        _logService = logService;
     }
 
     public string BackupDirectory => _backupDirectory;
@@ -56,7 +67,10 @@ public class BackupService : IBackupService
             // CRITICAL: Don't overwrite existing backup!
             // Another patcher may have already backed up this file.
             if (File.Exists(backupPath))
+            {
+                _logService?.LogDebug($"[Backup] Already exists: {virtualPath}");
                 return Task.FromResult(false); // Backup already exists - keep original version
+            }
 
             var directory = Path.GetDirectoryName(backupPath);
             if (!string.IsNullOrEmpty(directory))
@@ -66,6 +80,7 @@ public class BackupService : IBackupService
 
             // Write synchronously within lock to ensure atomicity
             File.WriteAllBytes(backupPath, data);
+            _logService?.LogInfo($"[Backup] Created: {virtualPath} ({data.Length} bytes)");
             return Task.FromResult(true);
         }
     }
@@ -85,6 +100,7 @@ public class BackupService : IBackupService
         if (File.Exists(backupPath))
         {
             File.Delete(backupPath);
+            _logService?.LogDebug($"[Backup] Removed: {virtualPath}");
 
             // Clean up empty directories
             CleanupEmptyDirectories(Path.GetDirectoryName(backupPath));
@@ -121,6 +137,11 @@ public class BackupService : IBackupService
 
         // File is dirty if it has markers but we don't have a backup
         result.IsDirty = result.DetectedMarkers.Count > 0 && !HasBackup(virtualPath);
+
+        if (result.IsDirty)
+        {
+            _logService?.LogWarning($"[Backup] Dirty state: {virtualPath}, markers: {string.Join(", ", result.DetectedMarkers)}");
+        }
 
         return result;
     }
@@ -163,7 +184,9 @@ public class BackupService : IBackupService
     {
         if (Directory.Exists(_backupDirectory))
         {
+            var count = Directory.GetFiles(_backupDirectory, "*", SearchOption.AllDirectories).Length;
             Directory.Delete(_backupDirectory, recursive: true);
+            _logService?.LogInfo($"[Backup] Cleared all backups ({count} files)");
         }
         Directory.CreateDirectory(_backupDirectory);
         return Task.CompletedTask;

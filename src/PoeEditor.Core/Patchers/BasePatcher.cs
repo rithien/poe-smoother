@@ -7,6 +7,17 @@ using BundleIndex = LibBundle3.Index;
 
 namespace PoeEditor.Core.Patchers;
 
+// Static logger for all patchers
+public static class PatcherLogger
+{
+    public static ILogService? LogService { get; set; }
+
+    public static void SetLogService(ILogService? logService)
+    {
+        LogService = logService;
+    }
+}
+
 /// <summary>
 /// Base class for all patchers with common functionality.
 /// Implements backup strategy from analysis/backups.md:
@@ -46,6 +57,11 @@ public abstract class BasePatcher : IPatcher
             var json = File.ReadAllText(configPath);
             Config = JsonSerializer.Deserialize<PatcherConfig>(json) ?? new PatcherConfig();
             IsEnabled = Config.Enabled;
+            PatcherLogger.LogService?.LogDebug($"[{GetType().Name}] Config loaded from {Path.GetFileName(configPath)}");
+        }
+        else
+        {
+            PatcherLogger.LogService?.LogWarning($"[{GetType().Name}] Config not found: {configPath}");
         }
     }
 
@@ -100,6 +116,11 @@ public abstract class BasePatcher : IPatcher
             {
                 var warning = $"Detected {dirtyFiles.Count} file(s) with modifications but no backup. " +
                              "Please verify game files integrity in Steam/Launcher before continuing.";
+                PatcherLogger.LogService?.LogWarning($"[{GetType().Name}] {warning}");
+                foreach (var df in dirtyFiles)
+                {
+                    PatcherLogger.LogService?.LogWarning($"  Dirty file: {df.FilePath}, markers: {string.Join(", ", df.DetectedMarkers)}");
+                }
                 return new PrePatchCheckResult(false, dirtyFiles, warning);
             }
 
@@ -153,6 +174,9 @@ public abstract class BasePatcher : IPatcher
 
     public virtual async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
     {
+        var patcherName = GetType().Name;
+        PatcherLogger.LogService?.LogInfo($"[{patcherName}] Starting patch (repatch={Config.Repatch})");
+
         return await Task.Run(async () =>
         {
             var modifiedCount = 0;
@@ -167,6 +191,7 @@ public abstract class BasePatcher : IPatcher
                     {
                         // One-time patch already applied - return success without modifications
                         progress?.Report($"Patch already applied (one-time patch, skipping)");
+                        PatcherLogger.LogService?.LogInfo($"[{patcherName}] Already applied (one-time), skipping");
                         return new PatchResult(true, 0, "Already applied");
                     }
                 }
@@ -209,17 +234,21 @@ public abstract class BasePatcher : IPatcher
                         // Write back to archive
                         file.Write(newData);
                         modifiedCount++;
+                        PatcherLogger.LogService?.LogDebug($"[{patcherName}] Modified: {file.Path}");
                     }
                 }
 
+                PatcherLogger.LogService?.LogInfo($"[{patcherName}] Completed: {modifiedCount} files modified");
                 return new PatchResult(true, modifiedCount);
             }
             catch (OperationCanceledException)
             {
+                PatcherLogger.LogService?.LogWarning($"[{patcherName}] Cancelled after {modifiedCount} files");
                 return new PatchResult(false, modifiedCount, "Operation cancelled");
             }
             catch (Exception ex)
             {
+                PatcherLogger.LogService?.LogError($"[{patcherName}] Failed after {modifiedCount} files", ex);
                 return new PatchResult(false, modifiedCount, ex.Message);
             }
         }, ct);
@@ -233,6 +262,9 @@ public abstract class BasePatcher : IPatcher
     /// </summary>
     public virtual async Task<PatchResult> RevertAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
     {
+        var patcherName = GetType().Name;
+        PatcherLogger.LogService?.LogInfo($"[{patcherName}] Starting revert");
+
         return await Task.Run(async () =>
         {
             var revertedCount = 0;
@@ -287,10 +319,12 @@ public abstract class BasePatcher : IPatcher
                 }
 
                 OriginalFiles.Clear();
+                PatcherLogger.LogService?.LogInfo($"[{patcherName}] Revert completed: {revertedCount} files restored");
                 return new PatchResult(true, revertedCount);
             }
             catch (Exception ex)
             {
+                PatcherLogger.LogService?.LogError($"[{patcherName}] Revert failed after {revertedCount} files", ex);
                 return new PatchResult(false, revertedCount, ex.Message);
             }
         }, ct);

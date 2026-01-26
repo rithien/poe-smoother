@@ -160,10 +160,13 @@ public class EnvironmentalParticlesPatcher : BasePatcher
     /// </summary>
     public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
     {
+        PatcherLogger.LogService?.LogInfo("[EnvParticles] Starting patch");
+
         return await Task.Run(async () =>
         {
             int modifiedCount = 0;
             int processedCount = 0;
+            int skippedCount = 0;
             var indexLock = new object();
 
             try
@@ -171,6 +174,7 @@ public class EnvironmentalParticlesPatcher : BasePatcher
                 var targetFiles = GetTargetFiles(index).ToList();
                 var totalFiles = targetFiles.Count;
 
+                PatcherLogger.LogService?.LogInfo($"[EnvParticles] Found {totalFiles} files matching patterns");
                 progress?.Report($"Found {totalFiles} environmental particle files to patch...");
 
                 // Parallel processing with controlled degree of parallelism
@@ -199,7 +203,10 @@ public class EnvironmentalParticlesPatcher : BasePatcher
 
                         // Skip if no continuous_effect to patch
                         if (!content.Contains("continuous_effect", StringComparison.OrdinalIgnoreCase))
+                        {
+                            Interlocked.Increment(ref skippedCount);
                             return;
+                        }
 
                         // Store backup using BackupService (First Touch strategy, thread-safe)
                         if (BackupService != null && !content.Contains(Marker))
@@ -231,15 +238,18 @@ public class EnvironmentalParticlesPatcher : BasePatcher
                         }
                     });
 
+                PatcherLogger.LogService?.LogInfo($"[EnvParticles] Completed: {modifiedCount} modified, {skippedCount} skipped (no effects)");
                 progress?.Report($"Environmental particles: Patched {modifiedCount} files");
                 return new PatchResult(true, modifiedCount);
             }
             catch (OperationCanceledException)
             {
+                PatcherLogger.LogService?.LogWarning($"[EnvParticles] Cancelled after {modifiedCount} files");
                 return new PatchResult(false, modifiedCount, "Operation cancelled");
             }
             catch (Exception ex)
             {
+                PatcherLogger.LogService?.LogError($"[EnvParticles] Failed after {modifiedCount} files", ex);
                 return new PatchResult(false, modifiedCount, ex.Message);
             }
         }, ct);
@@ -252,6 +262,8 @@ public class EnvironmentalParticlesPatcher : BasePatcher
     /// </summary>
     public override async Task<PatchResult> RevertAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
     {
+        PatcherLogger.LogService?.LogInfo("[EnvParticles] Starting revert");
+
         return await Task.Run(async () =>
         {
             int revertedCount = 0;
@@ -261,11 +273,13 @@ public class EnvironmentalParticlesPatcher : BasePatcher
             {
                 if (BackupService == null)
                 {
+                    PatcherLogger.LogService?.LogError("[EnvParticles] No backup service available");
                     return new PatchResult(false, 0, "No backup service available");
                 }
 
                 var backupPaths = BackupService.GetAllBackupPaths().ToList();
 
+                PatcherLogger.LogService?.LogDebug($"[EnvParticles] Checking {backupPaths.Count} backup files");
                 progress?.Report($"Checking {backupPaths.Count} backup files...");
 
                 // Parallel processing for revert
@@ -312,15 +326,18 @@ public class EnvironmentalParticlesPatcher : BasePatcher
                         }
                     });
 
+                PatcherLogger.LogService?.LogInfo($"[EnvParticles] Revert completed: {revertedCount} files restored");
                 progress?.Report($"Environmental particles: Restored {revertedCount} files");
                 return new PatchResult(true, revertedCount);
             }
             catch (OperationCanceledException)
             {
+                PatcherLogger.LogService?.LogWarning($"[EnvParticles] Revert cancelled after {revertedCount} files");
                 return new PatchResult(false, revertedCount, "Operation cancelled");
             }
             catch (Exception ex)
             {
+                PatcherLogger.LogService?.LogError($"[EnvParticles] Revert failed after {revertedCount} files", ex);
                 return new PatchResult(false, revertedCount, ex.Message);
             }
         }, ct);

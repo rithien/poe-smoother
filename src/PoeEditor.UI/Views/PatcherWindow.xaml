@@ -95,17 +95,42 @@
                 <!-- ===== VISUAL MODS GROUP ===== -->
                 <Expander IsExpanded="False" Margin="0,0,0,16">
                     <Expander.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🎨 Visual Mods"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource TextBrush}"/>
-                            <TextBlock Text="(Camera, Brightness, Colors)"
+                        <Grid Width="900">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="🎨 Visual Mods"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrush}"/>
+                                <TextBlock Text="(Camera, Brightness, Colors)"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"/>
+                            </StackPanel>
+                            
+                            <CheckBox Grid.Column="2"
+                                      IsChecked="{Binding SelectAllVisualMods}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Right"
+                                      Margin="0,0,8,0">
+                                <CheckBox.LayoutTransform>
+                                    <ScaleTransform ScaleX="1.2" ScaleY="1.2"/>
+                                </CheckBox.LayoutTransform>
+                            </CheckBox>
+                            <TextBlock Grid.Column="3"
+                                       Text="Select All (Max)"
                                        FontSize="12"
-                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Foreground="{StaticResource AccentBrush}"
                                        VerticalAlignment="Center"
-                                       Margin="12,0,0,0"/>
-                        </StackPanel>
+                                       HorizontalAlignment="Left"
+                                       FontWeight="SemiBold"/>
+                        </Grid>
                     </Expander.Header>
                     <StackPanel Margin="0,12,0,0">
 
@@ -557,17 +582,42 @@
                 <!-- ===== PERFORMANCE MODS GROUP ===== -->
                 <Expander IsExpanded="False" Margin="0,0,0,16">
                     <Expander.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚡ Performance Mods"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource TextBrush}"/>
-                            <TextBlock Text="(FPS Boost, Disable Effects)"
+                        <Grid Width="900">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="⚡ Performance Mods"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrush}"/>
+                                <TextBlock Text="(FPS Boost, Disable Effects)"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"/>
+                            </StackPanel>
+                            
+                            <CheckBox Grid.Column="2"
+                                      IsChecked="{Binding SelectAllPerformanceMods}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Right"
+                                      Margin="0,0,8,0">
+                                <CheckBox.LayoutTransform>
+                                    <ScaleTransform ScaleX="1.2" ScaleY="1.2"/>
+                                </CheckBox.LayoutTransform>
+                            </CheckBox>
+                            <TextBlock Grid.Column="3"
+                                       Text="Select All"
                                        FontSize="12"
-                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Foreground="{StaticResource AccentBrush}"
                                        VerticalAlignment="Center"
-                                       Margin="12,0,0,0"/>
-                        </StackPanel>
+                                       HorizontalAlignment="Left"
+                                       FontWeight="SemiBold"/>
+                        </Grid>
                     </Expander.Header>
                     <StackPanel Margin="0,12,0,0">
 
@@ -815,17 +865,42 @@
                 <!-- ===== PARTICLE MODS GROUP ===== -->
                 <Expander IsExpanded="False" Margin="0,0,0,16">
                     <Expander.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="✨ Particle Mods"
-                                       FontSize="18"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource TextBrush}"/>
-                            <TextBlock Text="(Disable Particle Effects)"
+                        <Grid Width="900">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <TextBlock Text="✨ Particle Mods"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextBrush}"/>
+                                <TextBlock Text="(Disable Particle Effects)"
+                                           FontSize="12"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"/>
+                            </StackPanel>
+                            
+                            <CheckBox Grid.Column="2"
+                                      IsChecked="{Binding SelectAllParticleMods}"
+                                      VerticalAlignment="Center"
+                                      HorizontalAlignment="Right"
+                                      Margin="0,0,8,0">
+                                <CheckBox.LayoutTransform>
+                                    <ScaleTransform ScaleX="1.2" ScaleY="1.2"/>
+                                </CheckBox.LayoutTransform>
+                            </CheckBox>
+                            <TextBlock Grid.Column="3"
+                                       Text="Select All"
                                        FontSize="12"
-                                       Foreground="{StaticResource TextMutedBrush}"
+                                       Foreground="{StaticResource AccentBrush}"
                                        VerticalAlignment="Center"
-                                       Margin="12,0,0,0"/>
-                        </StackPanel>
+                                       HorizontalAlignment="Left"
+                                       FontWeight="SemiBold"/>
+                        </Grid>
                     </Expander.Header>
                     <StackPanel Margin="0,12,0,0">
 
