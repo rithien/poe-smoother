@@ -171,6 +171,24 @@ FALSE TRUE
 
 ## Changelog
 
+### v0.1.13 (2026-01-26)
+
+- **NEW: Select All checkboxes** - Quick enable/disable all patches in each section
+  - "Select All (Max)" in Visual Mods header - enables all visual patches with maximum values:
+    - Camera Zoom x3 (max zoom out)
+    - Brightness x1.75 (+75%)
+    - SDR Scale x1.75 (+75%)
+    - Gamma 1.6 (very bright)
+    - Map Reveal enabled
+    - Vignette disabled
+  - "Select All" in Performance Mods header - enables all performance patches:
+    - GI with min values (0, 0) for max performance
+    - All other performance patchers enabled
+  - "Select All" in Particle Mods header - enables all particle patches
+  - Unchecking deselects all patches in that section
+- **FIX: UI Layout**
+  - Fixed alignment of "Select All" checkboxes in headers to ensure consistent positioning regardless of label text length
+
 ### v0.1.11 (2026-01-25)
 
 - **FIX: File Editor encoding detection**
