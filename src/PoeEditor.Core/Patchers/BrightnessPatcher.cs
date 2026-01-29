@@ -48,7 +48,7 @@ public class BrightnessPatcher : BasePatcher
 
     public override string Name => $"Brightness x{_multiplier.ToString("F2", CultureInfo.InvariantCulture)}";
 
-    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
+    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default)
     {
         return await Task.Run(async () =>
         {
@@ -66,9 +66,19 @@ public class BrightnessPatcher : BasePatcher
 
                     progress?.Report($"Patching brightness: {file.Path}");
 
-                    var data = file.Read();
-                    var encoding = DetectEncoding(data.Span, file.Path);
-                    var content = encoding.GetString(data.Span);
+                    // Read content (from context or disk)
+                    byte[] dataBytes;
+                    if (context != null && context.TryGetContent(file.Path, out var cachedData))
+                    {
+                        dataBytes = cachedData;
+                    }
+                    else
+                    {
+                        dataBytes = file.Read().ToArray();
+                    }
+
+                    var encoding = DetectEncoding(dataBytes.AsSpan(), file.Path);
+                    var content = encoding.GetString(dataBytes.AsSpan());
 
                     // Check for marker existence
                     bool hasMarker = content.Contains(Marker);
@@ -81,11 +91,11 @@ public class BrightnessPatcher : BasePatcher
                         // Store backup using BackupService (First Touch strategy)
                         if (BackupService != null)
                         {
-                            await BackupService.BackupFileAsync(file.Path, data.ToArray());
+                            await BackupService.BackupFileAsync(file.Path, dataBytes);
                         }
                         else if (!OriginalFiles.ContainsKey(file.Path))
                         {
-                            OriginalFiles[file.Path] = data.ToArray();
+                            OriginalFiles[file.Path] = dataBytes;
                         }
                     }
 
@@ -94,7 +104,18 @@ public class BrightnessPatcher : BasePatcher
                     if (modifiedContent != content)
                     {
                         var newData = encoding.GetBytes(modifiedContent);
-                        file.Write(newData);
+                        
+                        if (context != null)
+                        {
+                            // Deferred write
+                            context.UpdateContent(file.Path, newData);
+                        }
+                        else
+                        {
+                            // Direct write
+                            file.Write(newData);
+                        }
+                        
                         modifiedCount++;
                     }
                 }

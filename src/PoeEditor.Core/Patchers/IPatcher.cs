@@ -56,12 +56,6 @@ public interface IPatcher
     string Marker { get; }
 
     /// <summary>
-    /// Cached result of IsApplied check, set during CheckPatchStatusAsync.
-    /// Used to avoid repeated Bundle reads which can cause cache issues in LibBundle3.
-    /// </summary>
-    bool? CachedIsApplied { get; set; }
-
-    /// <summary>
     /// Set the backup service for persistent backups.
     /// </summary>
     void SetBackupService(IBackupService? backupService);
@@ -76,12 +70,12 @@ public interface IPatcher
     /// Check if this patcher's modifications are already present in the archive.
     /// Searches for the patcher's marker in target files.
     /// </summary>
-    Task<bool> IsAppliedAsync(BundleIndex index, CancellationToken ct = default);
+    Task<bool> IsAppliedAsync(BundleIndex index, PatchContext? context = null, CancellationToken ct = default);
 
     /// <summary>
     /// Apply the patch to the archive.
     /// </summary>
-    Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default);
+    Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default);
 
     /// <summary>
     /// Revert the patch (restore original files).

@@ -171,17 +171,6 @@ FALSE TRUE
 
 ## Changelog
 
-### v0.1.16 (2026-01-29)
-
-- **FIX: ArgumentOutOfRangeException "length must be less than or equal to 0" when all patchers selected**
-  - Problem: Error `(uint)length ('65496') must be less than or equal to '0'` occurred in `IsAppliedAsync` when all patchers were selected (particularly VignettePatcher and DepthOfFieldPatcher). This error appeared despite the v0.1.14 fix for offset issues.
-  - Cause: Multiple reads of the same file (`postprocessuber.hlsl`) by different patchers caused LibBundle3's internal Bundle cache issues. `ApplyAsync` was calling `IsAppliedAsync` before each patch, even though this information was already checked in `CheckPatchStatusAsync`.
-  - Solution: Introduced `IsApplied` result caching:
-    1. Added `CachedIsApplied` property to `IPatcher` and `BasePatcher`
-    2. In `CheckPatchStatusAsync`, the result is saved for each patcher
-    3. In `ApplyAsync`, cache is used instead of re-calling `IsAppliedAsync`
-    4. Cache is reset when archive is closed (`CloseArchive`)
-
 ### v0.1.15 (2026-01-26)
 
 - **FIX: Restore All not saving changes to disk**

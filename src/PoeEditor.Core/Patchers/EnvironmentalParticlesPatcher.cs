@@ -158,7 +158,7 @@ public class EnvironmentalParticlesPatcher : BasePatcher
     /// Override ApplyAsync to provide custom patching logic with parallel processing.
     /// Uses Parallel.ForEachAsync for better performance on large file sets.
     /// </summary>
-    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
+    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default)
     {
         PatcherLogger.LogService?.LogInfo("[EnvParticles] Starting patch");
 
@@ -191,14 +191,24 @@ public class EnvironmentalParticlesPatcher : BasePatcher
 
                         int currentProcessed = Interlocked.Increment(ref processedCount);
 
-                        // Read original content (lock for index thread safety)
+                        // Read content (from context or disk)
                         byte[] dataArray;
                         string content;
-                        lock (indexLock)
+                        
+                        if (context != null && context.TryGetContent(file.Path, out var cachedData))
                         {
-                            var data = file.Read();
-                            dataArray = data.ToArray();
-                            content = DetectAndDecodeContent(data.Span, file.Path);
+                            dataArray = cachedData;
+                            content = DetectAndDecodeContent(dataArray, file.Path);
+                        }
+                        else
+                        {
+                            // Read original content (lock for index thread safety)
+                            lock (indexLock)
+                            {
+                                var data = file.Read();
+                                dataArray = data.ToArray();
+                                content = DetectAndDecodeContent(data.Span, file.Path);
+                            }
                         }
 
                         // Skip if no continuous_effect to patch
@@ -211,6 +221,8 @@ public class EnvironmentalParticlesPatcher : BasePatcher
                         // Store backup using BackupService (First Touch strategy, thread-safe)
                         if (BackupService != null && !content.Contains(Marker))
                         {
+                            // Safe to backup dataArray even if it came from context (previous patcher modified it),.
+                            // BackupService ensures we don't overwrite existing backup (which should be original).
                             await BackupService.BackupFileAsync(file.Path, dataArray);
                         }
 
@@ -223,10 +235,18 @@ public class EnvironmentalParticlesPatcher : BasePatcher
                             var encoding = DetectEncoding(dataArray.AsSpan(), file.Path);
                             var newData = encoding.GetBytes(modifiedContent);
 
-                            // Write back to archive (lock for index thread safety)
-                            lock (indexLock)
+                            if (context != null)
                             {
-                                file.Write(newData);
+                                // Deferred write: update context only
+                                context.UpdateContent(file.Path, newData);
+                            }
+                            else
+                            {
+                                // Write back to archive (lock for index thread safety)
+                                lock (indexLock)
+                                {
+                                    file.Write(newData);
+                                }
                             }
 
                             int currentModified = Interlocked.Increment(ref modifiedCount);

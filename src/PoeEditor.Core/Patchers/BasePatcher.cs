@@ -31,12 +31,6 @@ public abstract class BasePatcher : IPatcher
     protected Dictionary<string, byte[]> OriginalFiles { get; } = new();
     protected IBackupService? BackupService { get; private set; }
 
-    /// <summary>
-    /// Cached result of IsApplied check, set during CheckPatchStatusAsync.
-    /// Used to avoid repeated Bundle reads which can cause cache issues in LibBundle3.
-    /// </summary>
-    public bool? CachedIsApplied { get; set; }
-
     public virtual string Name => Config.Name;
     public virtual string Description => Config.Description;
     public bool IsEnabled { get; set; }
@@ -138,18 +132,28 @@ public abstract class BasePatcher : IPatcher
     /// Check if this patcher's modifications are already present in the archive.
     /// If markerFile is defined, checks only that file. Otherwise searches all target files.
     /// </summary>
-    public virtual async Task<bool> IsAppliedAsync(BundleIndex index, CancellationToken ct = default)
+    public virtual async Task<bool> IsAppliedAsync(BundleIndex index, PatchContext? context = null, CancellationToken ct = default)
     {
         return await Task.Run(() =>
         {
+            // Helper to get file content (from context or disk)
+            ReadOnlySpan<byte> GetContent(FileRecord file)
+            {
+                if (file.Path != null && context != null && context.TryGetContent(file.Path, out var cachedData))
+                {
+                    return cachedData;
+                }
+                return file.Read().Span;
+            }
+
             // If markerFile is defined, check only that file for the marker
             if (!string.IsNullOrEmpty(MarkerFile))
             {
                 var markerFileRecord = FindFileByPath(index, MarkerFile);
                 if (markerFileRecord != null)
                 {
-                    var data = markerFileRecord.Read();
-                    var content = DetectAndDecodeContent(data.Span, MarkerFile);
+                    var data = GetContent(markerFileRecord);
+                    var content = DetectAndDecodeContent(data, MarkerFile);
                     return content.Contains(Marker, StringComparison.Ordinal);
                 }
                 return false;
@@ -164,8 +168,8 @@ public abstract class BasePatcher : IPatcher
 
                 if (file.Path == null) continue;
 
-                var data = file.Read();
-                var content = DetectAndDecodeContent(data.Span, file.Path);
+                var data = GetContent(file);
+                var content = DetectAndDecodeContent(data, file.Path);
 
                 // Check if this patcher's marker is present
                 if (content.Contains(Marker, StringComparison.Ordinal))
@@ -178,35 +182,21 @@ public abstract class BasePatcher : IPatcher
         }, ct);
     }
 
-    public virtual async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
+    public virtual async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default)
     {
-        // Use Name property for logging (ExternalPatcher overrides this with config name)
-        var patcherName = Name ?? GetType().Name;
+        var patcherName = GetType().Name;
         PatcherLogger.LogService?.LogInfo($"[{patcherName}] Starting patch (repatch={Config.Repatch})");
 
         return await Task.Run(async () =>
         {
             var modifiedCount = 0;
-            string? currentFilePath = null;
 
             try
             {
                 // Check if already applied and repatch is disabled (one-time patch)
                 if (!Config.Repatch)
                 {
-                    // Use cached result if available (from CheckPatchStatusAsync)
-                    // to avoid repeated Bundle reads which can cause LibBundle3 cache issues
-                    bool isApplied;
-                    if (CachedIsApplied.HasValue)
-                    {
-                        isApplied = CachedIsApplied.Value;
-                        PatcherLogger.LogService?.LogDebug($"[{patcherName}] Using cached IsApplied={isApplied}");
-                    }
-                    else
-                    {
-                        isApplied = await IsAppliedAsync(index, ct);
-                    }
-
+                    var isApplied = await IsAppliedAsync(index, context, ct);
                     if (isApplied)
                     {
                         // One-time patch already applied - return success without modifications
@@ -216,20 +206,26 @@ public abstract class BasePatcher : IPatcher
                     }
                 }
 
-                var targetFiles = GetTargetFiles(index).ToList();
-                PatcherLogger.LogService?.LogDebug($"[{patcherName}] Found {targetFiles.Count} target files");
+                var targetFiles = GetTargetFiles(index);
 
                 foreach (var file in targetFiles)
                 {
                     ct.ThrowIfCancellationRequested();
-                    currentFilePath = file.Path;
 
                     progress?.Report($"Patching: {file.Path}");
-                    PatcherLogger.LogService?.LogDebug($"[{patcherName}] Reading file: {file.Path}, Size={file.Size}, BundleIndex={file.BundleRecord?.BundleIndex}");
 
-                    // Read original content
-                    var data = file.Read();
-                    var content = DetectAndDecodeContent(data.Span, file.Path!);
+                    // Read content (from context or disk)
+                    byte[] dataBytes;
+                    if (file.Path != null && context != null && context.TryGetContent(file.Path, out var cachedData))
+                    {
+                        dataBytes = cachedData;
+                    }
+                    else
+                    {
+                        dataBytes = file.Read().ToArray();
+                    }
+                    
+                    var content = DetectAndDecodeContent(dataBytes, file.Path!);
 
                     // Store backup using BackupService (First Touch strategy)
                     // IMPORTANT: BackupService will only create backup if one doesn't exist.
@@ -237,12 +233,27 @@ public abstract class BasePatcher : IPatcher
                     if (BackupService != null)
                     {
                         // BackupFileAsync returns false if backup already exists (another patcher backed it up first)
-                        await BackupService.BackupFileAsync(file.Path!, data.ToArray());
+                        // Note: For backup we always want the ORIGINAL disk content, but if we are in a chain of patches,
+                        // we might not have easy access to original if it's not on disk yet.
+                        // However, First Touch mostly assumes we are backing up what was on disk initially.
+                        // If file was modified by previous patcher in context, we still want to back up the *original* state.
+                        // But BackupService checks file existence on disk.
+                        // Ideally backup happens before ANY modification.
+                        // If BackupService checks internal state, it should be fine.
+                        
+                        // We pass dataBytes here. If dataBytes came from context (modified), that's technically wrong for a backup 
+                        // IF this is the first time we see this file. 
+                        // BUT: If dataBytes came from context, it means a previous patcher touched it.
+                        // That previous patcher would have triggered the backup of the *original* data.
+                        // So calling BackupFileAsync here is safe (it will skip if backup exists).
+                        await BackupService.BackupFileAsync(file.Path!, dataBytes);
                     }
                     else if (!OriginalFiles.ContainsKey(file.Path!))
                     {
                         // Fallback to in-memory backup
-                        OriginalFiles[file.Path!] = data.ToArray();
+                        // Logic similar to above: if modified in context, we might be backing up modified data 
+                        // if we are not careful. But OriginalFiles check handles "First Touch".
+                        OriginalFiles[file.Path!] = dataBytes;
                     }
 
                     // Apply replacements
@@ -251,11 +262,20 @@ public abstract class BasePatcher : IPatcher
                     if (modifiedContent != content)
                     {
                         // Encode back with same encoding
-                        var encoding = DetectEncoding(data.Span, file.Path!);
+                        var encoding = DetectEncoding(dataBytes, file.Path!);
                         var newData = encoding.GetBytes(modifiedContent);
 
-                        // Write back to archive
-                        file.Write(newData);
+                        if (context != null)
+                        {
+                            // Deferred write: update context only
+                            context.UpdateContent(file.Path!, newData);
+                        }
+                        else
+                        {
+                            // Direct write: write to archive
+                            file.Write(newData);
+                        }
+                        
                         modifiedCount++;
                         PatcherLogger.LogService?.LogDebug($"[{patcherName}] Modified: {file.Path}");
                     }
@@ -271,8 +291,8 @@ public abstract class BasePatcher : IPatcher
             }
             catch (Exception ex)
             {
-                PatcherLogger.LogService?.LogError($"[{patcherName}] Failed after {modifiedCount} files at file: {currentFilePath ?? "unknown"}", ex);
-                return new PatchResult(false, modifiedCount, $"{ex.Message} (file: {currentFilePath ?? "unknown"})");
+                PatcherLogger.LogService?.LogError($"[{patcherName}] Failed after {modifiedCount} files", ex);
+                return new PatchResult(false, modifiedCount, ex.Message);
             }
         }, ct);
     }

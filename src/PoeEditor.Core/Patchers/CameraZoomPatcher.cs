@@ -34,7 +34,7 @@ public class CameraZoomPatcher : BasePatcher
         }
     }
 
-    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
+    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default)
     {
         return await Task.Run(async () =>
         {
@@ -54,9 +54,19 @@ public class CameraZoomPatcher : BasePatcher
                     return new PatchResult(false, 0, $"Marker file not found: {MarkerFile}");
                 }
 
-                var markerFileData = markerFileRecord.Read();
-                var markerFileEncoding = DetectEncoding(markerFileData.Span, MarkerFile);
-                var markerFileContent = markerFileEncoding.GetString(markerFileData.Span);
+                // Read content (from context or disk)
+                byte[] markerFileDataBytes;
+                if (context != null && context.TryGetContent(MarkerFile, out var cachedData))
+                {
+                    markerFileDataBytes = cachedData;
+                }
+                else
+                {
+                    markerFileDataBytes = markerFileRecord.Read().ToArray();
+                }
+
+                var markerFileEncoding = DetectEncoding(markerFileDataBytes.AsSpan(), MarkerFile);
+                var markerFileContent = markerFileEncoding.GetString(markerFileDataBytes.AsSpan());
                 var hasMarker = markerFileContent.Contains(Marker, StringComparison.Ordinal);
 
                 progress?.Report($"Marker file check: hasMarker={hasMarker}");
@@ -78,7 +88,7 @@ public class CameraZoomPatcher : BasePatcher
 
                 // Step 2: Patch character.ot (MarkerFile)
                 progress?.Report($"Patching: {MarkerFile}");
-                var markerFileModified = await PatchMarkerFileAsync(markerFileRecord, markerFileContent, markerFileEncoding, hasMarker, markerFileData.ToArray(), progress);
+                var markerFileModified = await PatchMarkerFileAsync(markerFileRecord, markerFileContent, markerFileEncoding, hasMarker, markerFileDataBytes, progress, context);
                 if (markerFileModified)
                 {
                     modifiedCount++;
@@ -101,9 +111,19 @@ public class CameraZoomPatcher : BasePatcher
 
                     if (file.Path == null) continue;
 
-                    var data = file.Read();
-                    var encoding = DetectEncoding(data.Span, file.Path);
-                    var content = encoding.GetString(data.Span);
+                    // Read content (from context or disk)
+                    byte[] dataBytes;
+                    if (context != null && context.TryGetContent(file.Path, out var cached))
+                    {
+                        dataBytes = cached;
+                    }
+                    else
+                    {
+                        dataBytes = file.Read().ToArray();
+                    }
+
+                    var encoding = DetectEncoding(dataBytes.AsSpan(), file.Path);
+                    var content = encoding.GetString(dataBytes.AsSpan());
 
                     // Only process files that contain CreateCameraZoomNode
                     if (!content.Contains("CreateCameraZoomNode", StringComparison.Ordinal))
@@ -118,7 +138,7 @@ public class CameraZoomPatcher : BasePatcher
                     // Backup if no marker (first time patching this file)
                     if (!fileHasMarker && BackupService != null)
                     {
-                        await BackupService.BackupFileAsync(file.Path, data.ToArray());
+                        await BackupService.BackupFileAsync(file.Path, dataBytes);
                     }
 
                     // Apply patch
@@ -127,7 +147,16 @@ public class CameraZoomPatcher : BasePatcher
                     if (modifiedContent != content)
                     {
                         var newData = encoding.GetBytes(modifiedContent);
-                        file.Write(newData);
+                        
+                        if (context != null)
+                        {
+                            context.UpdateContent(file.Path, newData);
+                        }
+                        else
+                        {
+                            file.Write(newData);
+                        }
+                        
                         modifiedCount++;
                         progress?.Report($"Modified: {file.Path}");
                     }
@@ -146,7 +175,7 @@ public class CameraZoomPatcher : BasePatcher
         }, ct);
     }
 
-    private async Task<bool> PatchMarkerFileAsync(FileRecord file, string content, Encoding encoding, bool hasMarker, byte[] originalData, IProgress<string>? progress)
+    private async Task<bool> PatchMarkerFileAsync(FileRecord file, string content, Encoding encoding, bool hasMarker, byte[] originalData, IProgress<string>? progress, PatchContext? context = null)
     {
         string modifiedContent;
 
@@ -170,7 +199,15 @@ public class CameraZoomPatcher : BasePatcher
         if (modifiedContent != content)
         {
             var newData = encoding.GetBytes(modifiedContent);
-            file.Write(newData);
+            
+            if (context != null)
+            {
+                context.UpdateContent(file.Path!, newData);
+            }
+            else
+            {
+                file.Write(newData);
+            }
             return true;
         }
 

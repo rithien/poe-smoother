@@ -43,7 +43,7 @@ public class SdrScalePatcher : BasePatcher
 
     public override string Name => $"SDR Scale x{_multiplier.ToString("F2", CultureInfo.InvariantCulture)}";
 
-    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
+    public override async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, PatchContext? context = null, CancellationToken ct = default)
     {
         return await Task.Run(async () =>
         {
@@ -61,18 +61,32 @@ public class SdrScalePatcher : BasePatcher
 
                     progress?.Report($"Patching SDR scale: {file.Path}");
 
-                    var data = file.Read();
-                    var encoding = DetectEncoding(data.Span, file.Path);
-                    var content = encoding.GetString(data.Span);
+                    // Read content (from context or disk)
+                    byte[] dataBytes;
+                    if (context != null && context.TryGetContent(file.Path, out var cachedData))
+                    {
+                        dataBytes = cachedData;
+                    }
+                    else
+                    {
+                        dataBytes = file.Read().ToArray();
+                    }
+
+                    var encoding = DetectEncoding(dataBytes.AsSpan(), file.Path);
+                    var content = encoding.GetString(dataBytes.AsSpan());
 
                     // Store backup using BackupService (First Touch strategy)
                     if (BackupService != null)
                     {
-                        await BackupService.BackupFileAsync(file.Path, data.ToArray());
+                        // Check if we need backup (if no marker) - simplified logic relies on BackupService not overwriting
+                        // But strictly we should check marker. ApplyReplacements does check, but here we do it manually?
+                        // Base implementation checks marker. Here we don't seem to check marker before backup explicitly in original code?
+                        // Original code: always calls BackupFileAsync. BackupService handles "don't overwrite original".
+                        await BackupService.BackupFileAsync(file.Path, dataBytes);
                     }
                     else if (!OriginalFiles.ContainsKey(file.Path))
                     {
-                        OriginalFiles[file.Path] = data.ToArray();
+                        OriginalFiles[file.Path] = dataBytes;
                     }
 
                     var modifiedContent = ApplySdrScaleBoost(content);
@@ -80,7 +94,18 @@ public class SdrScalePatcher : BasePatcher
                     if (modifiedContent != content)
                     {
                         var newData = encoding.GetBytes(modifiedContent);
-                        file.Write(newData);
+                        
+                        if (context != null)
+                        {
+                            // Deferred write
+                            context.UpdateContent(file.Path, newData);
+                        }
+                        else
+                        {
+                            // Direct write
+                            file.Write(newData);
+                        }
+                        
                         modifiedCount++;
                     }
                 }

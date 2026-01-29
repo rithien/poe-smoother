@@ -226,21 +226,9 @@ public class ExtractionService : IExtractionService
 
             file.Write(content.Span);
 
-            // NOTE: Do NOT call index.Save() here!
-            // After Save(), Bundle objects are rewritten and FileRecord offsets become invalid.
-            // This causes ArgumentOutOfRangeException when other patchers try to read files.
-            // Changes are kept in memory and saved by ApplyPatchesAsync or SaveArchiveAsync.
+            // Save index to persist changes and update file metadata
+            index.Save();
         }, cancellationToken);
-    }
-
-    /// <inheritdoc/>
-    public async Task SaveArchiveAsync(CancellationToken cancellationToken = default)
-    {
-        var index = ActiveIndex;
-        if (index == null)
-            throw new InvalidOperationException("No archive is open.");
-
-        await Task.Run(() => index.Save(), cancellationToken);
     }
 
     /// <inheritdoc/>

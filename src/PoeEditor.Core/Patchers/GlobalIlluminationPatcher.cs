@@ -41,10 +41,11 @@ public class GlobalIlluminationPatcher : BasePatcher
     public override async Task<PatchResult> ApplyAsync(
         BundleIndex index,
         IProgress<string>? progress = null,
+        PatchContext? context = null,
         CancellationToken ct = default)
     {
         UpdateConfig();  // Refresh config with current slider values
-        return await base.ApplyAsync(index, progress, ct);
+        return await base.ApplyAsync(index, progress, context, ct);
     }
 
     private void UpdateConfig()

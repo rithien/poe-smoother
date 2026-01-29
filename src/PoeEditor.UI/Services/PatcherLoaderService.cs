@@ -87,15 +87,7 @@ public class ExternalPatcher : BasePatcher
         LoadConfigFromJson(JsonSerializer.Serialize(config));
     }
 
-    /// <summary>
-    /// Returns the patcher name from config for better logging.
-    /// This is used by BasePatcher.ApplyAsync for logging (GetType().Name would return "ExternalPatcher").
-    /// </summary>
-    public string PatcherIdentifier => !string.IsNullOrEmpty(_config.Name)
-        ? _config.Name
-        : Path.GetFileNameWithoutExtension(_sourceFile);
-
-    public override string Name => PatcherIdentifier;
+    public override string Name => !string.IsNullOrEmpty(_config.Name) ? _config.Name : Path.GetFileNameWithoutExtension(_sourceFile);
     public override string Category => _config.Category;
     public override int ImpactLevel => _config.ImpactLevel;
     public override string MarkerFile => _config.MarkerFile;
