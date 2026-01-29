@@ -31,6 +31,12 @@ public abstract class BasePatcher : IPatcher
     protected Dictionary<string, byte[]> OriginalFiles { get; } = new();
     protected IBackupService? BackupService { get; private set; }
 
+    /// <summary>
+    /// Cached result of IsApplied check, set during CheckPatchStatusAsync.
+    /// Used to avoid repeated Bundle reads which can cause cache issues in LibBundle3.
+    /// </summary>
+    public bool? CachedIsApplied { get; set; }
+
     public virtual string Name => Config.Name;
     public virtual string Description => Config.Description;
     public bool IsEnabled { get; set; }
@@ -186,7 +192,19 @@ public abstract class BasePatcher : IPatcher
                 // Check if already applied and repatch is disabled (one-time patch)
                 if (!Config.Repatch)
                 {
-                    var isApplied = await IsAppliedAsync(index, ct);
+                    // Use cached result if available (from CheckPatchStatusAsync)
+                    // to avoid repeated Bundle reads which can cause LibBundle3 cache issues
+                    bool isApplied;
+                    if (CachedIsApplied.HasValue)
+                    {
+                        isApplied = CachedIsApplied.Value;
+                        PatcherLogger.LogService?.LogDebug($"[{patcherName}] Using cached IsApplied={isApplied}");
+                    }
+                    else
+                    {
+                        isApplied = await IsAppliedAsync(index, ct);
+                    }
+
                     if (isApplied)
                     {
                         // One-time patch already applied - return success without modifications

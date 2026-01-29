@@ -56,6 +56,12 @@ public interface IPatcher
     string Marker { get; }
 
     /// <summary>
+    /// Cached result of IsApplied check, set during CheckPatchStatusAsync.
+    /// Used to avoid repeated Bundle reads which can cause cache issues in LibBundle3.
+    /// </summary>
+    bool? CachedIsApplied { get; set; }
+
+    /// <summary>
     /// Set the backup service for persistent backups.
     /// </summary>
     void SetBackupService(IBackupService? backupService);

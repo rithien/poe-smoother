@@ -555,7 +555,49 @@ public partial class MainViewModel : ObservableObject
         FileTree.Clear();
         ArchivePath = "";
         SelectedEntry = null;
+
+        // Reset cached IsApplied for all patchers
+        ResetPatcherCaches();
+
         StatusText = "Archive closed. Ready to open a new file.";
+    }
+
+    /// <summary>
+    /// Resets CachedIsApplied for all patchers. Called when archive is closed or reopened.
+    /// </summary>
+    private void ResetPatcherCaches()
+    {
+        // Reset external patchers
+        foreach (var patcherVm in Patchers)
+        {
+            patcherVm.Patcher.CachedIsApplied = null;
+        }
+
+        // Reset zoom patchers
+        if (_zoomPatcher1x != null) _zoomPatcher1x.CachedIsApplied = null;
+        if (_zoomPatcher2x != null) _zoomPatcher2x.CachedIsApplied = null;
+        if (_zoomPatcher3x != null) _zoomPatcher3x.CachedIsApplied = null;
+
+        // Reset brightness patchers
+        if (_brightnessPatcher125 != null) _brightnessPatcher125.CachedIsApplied = null;
+        if (_brightnessPatcher150 != null) _brightnessPatcher150.CachedIsApplied = null;
+        if (_brightnessPatcher175 != null) _brightnessPatcher175.CachedIsApplied = null;
+
+        // Reset SDR scale patchers
+        if (_sdrScalePatcher125 != null) _sdrScalePatcher125.CachedIsApplied = null;
+        if (_sdrScalePatcher150 != null) _sdrScalePatcher150.CachedIsApplied = null;
+        if (_sdrScalePatcher175 != null) _sdrScalePatcher175.CachedIsApplied = null;
+
+        // Reset gamma patchers
+        if (_gammaPatcher20 != null) _gammaPatcher20.CachedIsApplied = null;
+        if (_gammaPatcher18 != null) _gammaPatcher18.CachedIsApplied = null;
+        if (_gammaPatcher16 != null) _gammaPatcher16.CachedIsApplied = null;
+
+        // Reset other patchers
+        if (_mapRevealPatcher != null) _mapRevealPatcher.CachedIsApplied = null;
+        if (_vignettePatcher != null) _vignettePatcher.CachedIsApplied = null;
+        if (_envParticlesPatcher != null) _envParticlesPatcher.CachedIsApplied = null;
+        if (_giPatcher != null) _giPatcher.CachedIsApplied = null;
     }
 
     private async Task LoadArchiveAsync(string path)
@@ -640,6 +682,9 @@ public partial class MainViewModel : ObservableObject
             {
                 var isApplied = await patcherVm.Patcher.IsAppliedAsync(index);
 
+                // Cache the result to avoid repeated Bundle reads in ApplyAsync
+                patcherVm.Patcher.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     // Check if backup exists
@@ -671,6 +716,7 @@ public partial class MainViewModel : ObservableObject
             {
                 patcherVm.IsApplied = false;
                 patcherVm.IsDirty = false;
+                patcherVm.Patcher.CachedIsApplied = false;
             }
         }
 
@@ -714,6 +760,12 @@ public partial class MainViewModel : ObservableObject
             {
                 var appliedLevel = await _zoomPatcher2x.GetAppliedZoomLevelAsync(index);
 
+                // Cache for all zoom patchers
+                var zoomApplied = appliedLevel > 0;
+                if (_zoomPatcher1x != null) _zoomPatcher1x.CachedIsApplied = zoomApplied;
+                if (_zoomPatcher2x != null) _zoomPatcher2x.CachedIsApplied = zoomApplied;
+                if (_zoomPatcher3x != null) _zoomPatcher3x.CachedIsApplied = zoomApplied;
+
                 if (appliedLevel > 0)
                 {
                     SelectedZoomLevel = appliedLevel;
@@ -752,6 +804,12 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _brightnessPatcher125.IsAppliedAsync(index);
+
+                // Cache for all brightness patchers
+                if (_brightnessPatcher125 != null) _brightnessPatcher125.CachedIsApplied = isApplied;
+                if (_brightnessPatcher150 != null) _brightnessPatcher150.CachedIsApplied = isApplied;
+                if (_brightnessPatcher175 != null) _brightnessPatcher175.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = _brightnessPatcher125.MarkerFile;
@@ -787,6 +845,12 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _sdrScalePatcher125.IsAppliedAsync(index);
+
+                // Cache for all SDR scale patchers
+                if (_sdrScalePatcher125 != null) _sdrScalePatcher125.CachedIsApplied = isApplied;
+                if (_sdrScalePatcher150 != null) _sdrScalePatcher150.CachedIsApplied = isApplied;
+                if (_sdrScalePatcher175 != null) _sdrScalePatcher175.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = "shaders/include/oetf.hlsl";
@@ -822,6 +886,12 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _gammaPatcher20.IsAppliedAsync(index);
+
+                // Cache for all gamma patchers
+                if (_gammaPatcher20 != null) _gammaPatcher20.CachedIsApplied = isApplied;
+                if (_gammaPatcher18 != null) _gammaPatcher18.CachedIsApplied = isApplied;
+                if (_gammaPatcher16 != null) _gammaPatcher16.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = "shaders/include/oetf.hlsl";
@@ -857,6 +927,10 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _mapRevealPatcher.IsAppliedAsync(index);
+
+                // Cache the result
+                _mapRevealPatcher.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = _mapRevealPatcher.MarkerFile;
@@ -893,6 +967,10 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _vignettePatcher.IsAppliedAsync(index);
+
+                // Cache the result
+                _vignettePatcher.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = _vignettePatcher.MarkerFile;
@@ -929,6 +1007,10 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _envParticlesPatcher.IsAppliedAsync(index);
+
+                // Cache the result
+                _envParticlesPatcher.CachedIsApplied = isApplied;
+
                 if (isApplied)
                 {
                     var markerFile = _envParticlesPatcher.MarkerFile;
@@ -965,6 +1047,9 @@ public partial class MainViewModel : ObservableObject
             try
             {
                 var isApplied = await _giPatcher.IsAppliedAsync(index);
+
+                // Cache the result
+                _giPatcher.CachedIsApplied = isApplied;
 
                 if (isApplied)
                 {

@@ -171,6 +171,34 @@ FALSE TRUE
 
 ## Changelog
 
+### v0.1.16 (2026-01-29)
+
+- **FIX: ArgumentOutOfRangeException "length must be less than or equal to 0" when all patchers selected**
+  - Problem: Error `(uint)length ('65496') must be less than or equal to '0'` occurred in `IsAppliedAsync` when all patchers were selected (particularly VignettePatcher and DepthOfFieldPatcher). This error appeared despite the v0.1.14 fix for offset issues.
+  - Cause: Multiple reads of the same file (`postprocessuber.hlsl`) by different patchers caused LibBundle3's internal Bundle cache issues. `ApplyAsync` was calling `IsAppliedAsync` before each patch, even though this information was already checked in `CheckPatchStatusAsync`.
+  - Solution: Introduced `IsApplied` result caching:
+    1. Added `CachedIsApplied` property to `IPatcher` and `BasePatcher`
+    2. In `CheckPatchStatusAsync`, the result is saved for each patcher
+    3. In `ApplyAsync`, cache is used instead of re-calling `IsAppliedAsync`
+    4. Cache is reset when archive is closed (`CloseArchive`)
+
+### v0.1.15 (2026-01-26)
+
+- **FIX: Restore All not saving changes to disk**
+  - Problem: `RestoreAllAsync()` restored files only in memory (RAM) but did NOT call `index.Save()`. After closing/reopening the archive, files remained patched while backups were already deleted (resulting in "Dirty" state).
+  - Solution: Added 3-phase logic:
+    1. Phase 1: Restore all files to memory
+    2. Phase 2: Save changes to disk (`index.Save()`) BEFORE removing backups
+    3. Phase 3: Remove backups only after successful save
+  - This ensures backups remain available if save fails
+
+### v0.1.14 (2026-01-26)
+
+- **FIX: ArgumentOutOfRangeException when all patchers selected**
+  - Problem: Error `offset ('398649') must be less than or equal to '186898'` occurred only when all patchers were selected
+  - Cause: Multiple patchers modify the same file `postprocessuber.hlsl` (Bloom, DoF, Brightness, Vignette). After each patcher, `index.Save()` was called, which rewrote the bundle and invalidated offsets in `FileRecord`. Next patcher used stale offsets → crash.
+  - Solution: Removed intermediate `Save()` calls between patchers. Now `Save()` is called only once at the end after all patchers complete.
+
 ### v0.1.13 (2026-01-26)
 
 - **NEW: Select All checkboxes** - Quick enable/disable all patches in each section
@@ -182,7 +210,7 @@ FALSE TRUE
     - Map Reveal enabled
     - Vignette disabled
   - "Select All" in Performance Mods header - enables all performance patches:
-    - GI with min values (0, 0) for max performance
+    - GI with max brightness values (1.0, 1.0)
     - All other performance patchers enabled
   - "Select All" in Particle Mods header - enables all particle patches
   - Unchecking deselects all patches in that section
