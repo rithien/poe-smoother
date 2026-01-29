@@ -455,6 +455,19 @@ public partial class MainViewModel : ObservableObject
         await _extractionService.WriteFileContentAsync(virtualPath, content, cancellationToken);
     }
 
+    /// <summary>
+    /// Saves all pending changes to the archive on disk.
+    /// WARNING: After calling this, the archive should be reopened before using patchers
+    /// because FileRecord offsets may be invalidated.
+    /// </summary>
+    public async Task SaveArchiveAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_extractionService.IsOpen)
+            throw new InvalidOperationException("No archive is open.");
+
+        await _extractionService.SaveArchiveAsync(cancellationToken);
+    }
+
     [RelayCommand]
     private void ToggleDefenderExclusion()
     {
@@ -672,18 +685,30 @@ public partial class MainViewModel : ObservableObject
             patcherVm.Patcher.SetBackupService(_backupService);
         }
 
-        // Check and cleanup stale backups (if no markers found but backups exist)
-        await CheckAndCleanupBackupsAsync(index);
-
-        // Check external patchers
+        // First pass: check all external patchers and cache results
+        // This avoids multiple Bundle reads which can cause cache issues in LibBundle3
         foreach (var patcherVm in Patchers)
         {
             try
             {
                 var isApplied = await patcherVm.Patcher.IsAppliedAsync(index);
-
-                // Cache the result to avoid repeated Bundle reads in ApplyAsync
                 patcherVm.Patcher.CachedIsApplied = isApplied;
+            }
+            catch
+            {
+                patcherVm.Patcher.CachedIsApplied = false;
+            }
+        }
+
+        // Check and cleanup stale backups using cached results
+        await CheckAndCleanupBackupsAsync(index);
+
+        // Second pass: update UI state using cached results (no Bundle reads)
+        foreach (var patcherVm in Patchers)
+        {
+            try
+            {
+                var isApplied = patcherVm.Patcher.CachedIsApplied ?? false;
 
                 if (isApplied)
                 {
@@ -1084,6 +1109,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>
     /// Check if backups exist but no markers found in files - indicates clean game files.
     /// In this case, clear all stale backups.
+    /// NOTE: This method uses CachedIsApplied which must be populated before calling.
     /// </summary>
     private async Task CheckAndCleanupBackupsAsync(LibBundle3.Index index)
     {
@@ -1091,35 +1117,60 @@ public partial class MainViewModel : ObservableObject
         if (!_backupService.HasAnyBackups())
             return;
 
-        // Check if any patcher has markers in the files
+        // Check if any patcher has markers using CACHED results (avoid repeated Bundle reads)
         bool anyMarkerFound = false;
 
+        // Check external patchers using cache
         foreach (var patcherVm in Patchers)
         {
-            if (await patcherVm.Patcher.IsAppliedAsync(index))
+            if (patcherVm.Patcher.CachedIsApplied == true)
             {
                 anyMarkerFound = true;
                 break;
             }
         }
 
-        // Also check special patchers
-        if (!anyMarkerFound && _zoomPatcher2x != null && await _zoomPatcher2x.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _brightnessPatcher125 != null && await _brightnessPatcher125.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _gammaPatcher20 != null && await _gammaPatcher20.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _sdrScalePatcher125 != null && await _sdrScalePatcher125.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _mapRevealPatcher != null && await _mapRevealPatcher.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _vignettePatcher != null && await _vignettePatcher.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _envParticlesPatcher != null && await _envParticlesPatcher.IsAppliedAsync(index))
-            anyMarkerFound = true;
-        if (!anyMarkerFound && _giPatcher != null && await _giPatcher.IsAppliedAsync(index))
-            anyMarkerFound = true;
+        // Also check special patchers (these need to populate their cache too)
+        if (!anyMarkerFound && _zoomPatcher2x != null)
+        {
+            _zoomPatcher2x.CachedIsApplied ??= await _zoomPatcher2x.IsAppliedAsync(index);
+            if (_zoomPatcher2x.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _brightnessPatcher125 != null)
+        {
+            _brightnessPatcher125.CachedIsApplied ??= await _brightnessPatcher125.IsAppliedAsync(index);
+            if (_brightnessPatcher125.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _gammaPatcher20 != null)
+        {
+            _gammaPatcher20.CachedIsApplied ??= await _gammaPatcher20.IsAppliedAsync(index);
+            if (_gammaPatcher20.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _sdrScalePatcher125 != null)
+        {
+            _sdrScalePatcher125.CachedIsApplied ??= await _sdrScalePatcher125.IsAppliedAsync(index);
+            if (_sdrScalePatcher125.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _mapRevealPatcher != null)
+        {
+            _mapRevealPatcher.CachedIsApplied ??= await _mapRevealPatcher.IsAppliedAsync(index);
+            if (_mapRevealPatcher.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _vignettePatcher != null)
+        {
+            _vignettePatcher.CachedIsApplied ??= await _vignettePatcher.IsAppliedAsync(index);
+            if (_vignettePatcher.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _envParticlesPatcher != null)
+        {
+            _envParticlesPatcher.CachedIsApplied ??= await _envParticlesPatcher.IsAppliedAsync(index);
+            if (_envParticlesPatcher.CachedIsApplied == true) anyMarkerFound = true;
+        }
+        if (!anyMarkerFound && _giPatcher != null)
+        {
+            _giPatcher.CachedIsApplied ??= await _giPatcher.IsAppliedAsync(index);
+            if (_giPatcher.CachedIsApplied == true) anyMarkerFound = true;
+        }
 
         // If no markers found but backups exist - game files were restored externally (e.g., Steam verify)
         // Clear stale backups

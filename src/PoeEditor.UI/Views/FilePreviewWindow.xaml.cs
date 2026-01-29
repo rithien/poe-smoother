@@ -198,6 +198,9 @@ public partial class FilePreviewWindow : Window
             var content = EncodeContent(ContentTextBox.Text);
             await _viewModel.WriteFileContentAsync(_virtualPath, content);
 
+            // Save to disk immediately
+            await _viewModel.SaveArchiveAsync();
+
             _originalContent = ContentTextBox.Text;
             _isDirty = false;
             UpdateDirtyState();
@@ -205,7 +208,10 @@ public partial class FilePreviewWindow : Window
             // Update file size display
             FileSizeText.Text = FormatFileSize(content.Length);
 
-            MessageBox.Show("File saved successfully.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                "File saved successfully.\n\n" +
+                "Note: If you want to use patchers, you need to close and reopen the archive first.",
+                "Success", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {

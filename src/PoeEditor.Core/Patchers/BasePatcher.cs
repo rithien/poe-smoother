@@ -180,12 +180,14 @@ public abstract class BasePatcher : IPatcher
 
     public virtual async Task<PatchResult> ApplyAsync(BundleIndex index, IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        var patcherName = GetType().Name;
+        // Use Name property for logging (ExternalPatcher overrides this with config name)
+        var patcherName = Name ?? GetType().Name;
         PatcherLogger.LogService?.LogInfo($"[{patcherName}] Starting patch (repatch={Config.Repatch})");
 
         return await Task.Run(async () =>
         {
             var modifiedCount = 0;
+            string? currentFilePath = null;
 
             try
             {
@@ -214,13 +216,16 @@ public abstract class BasePatcher : IPatcher
                     }
                 }
 
-                var targetFiles = GetTargetFiles(index);
+                var targetFiles = GetTargetFiles(index).ToList();
+                PatcherLogger.LogService?.LogDebug($"[{patcherName}] Found {targetFiles.Count} target files");
 
                 foreach (var file in targetFiles)
                 {
                     ct.ThrowIfCancellationRequested();
+                    currentFilePath = file.Path;
 
                     progress?.Report($"Patching: {file.Path}");
+                    PatcherLogger.LogService?.LogDebug($"[{patcherName}] Reading file: {file.Path}, Size={file.Size}, BundleIndex={file.BundleRecord?.BundleIndex}");
 
                     // Read original content
                     var data = file.Read();
@@ -266,8 +271,8 @@ public abstract class BasePatcher : IPatcher
             }
             catch (Exception ex)
             {
-                PatcherLogger.LogService?.LogError($"[{patcherName}] Failed after {modifiedCount} files", ex);
-                return new PatchResult(false, modifiedCount, ex.Message);
+                PatcherLogger.LogService?.LogError($"[{patcherName}] Failed after {modifiedCount} files at file: {currentFilePath ?? "unknown"}", ex);
+                return new PatchResult(false, modifiedCount, $"{ex.Message} (file: {currentFilePath ?? "unknown"})");
             }
         }, ct);
     }

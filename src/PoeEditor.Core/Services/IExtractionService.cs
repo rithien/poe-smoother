@@ -94,11 +94,20 @@ public interface IExtractionService : IDisposable
 
     /// <summary>
     /// Writes file content directly to the archive.
+    /// Note: This does NOT automatically save to disk. Call SaveArchiveAsync to persist changes.
     /// </summary>
     /// <param name="virtualPath">Virtual path of the file within the archive.</param>
     /// <param name="content">Raw file content as bytes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task WriteFileContentAsync(string virtualPath, ReadOnlyMemory<byte> content, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Saves all pending changes to the archive on disk.
+    /// IMPORTANT: After calling this, FileRecord offsets may be invalidated.
+    /// Do not read files after saving without reopening the archive.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SaveArchiveAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Closes the currently open archive.
